@@ -7,8 +7,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 export PGPORT="${PGPORT:-5430}"
 export PGDATA="${PGDATA:-"$SCRIPT_DIR/data"}"
-# Unix socket lives inside PGDATA so it can't collide with any other local
-# Postgres instance using the default /tmp socket directory.
+export PGSOCK="$SCRIPT_DIR/.pgsock"
+export PGLOG="$SCRIPT_DIR/.pglog"
 export PGHOST="${PGHOST:-"$PGDATA"}"
+export DBNAME=trellis_poc
+export LOCAL_DATABASE_URL="postgresql://postgres@localhost:${PGPORT}/${DBNAME}"
+export TRELLIS_DATABASE_URL=$LOCAL_DATABASE_URL
 
 LOG_FILE="${LOG_FILE:-"$SCRIPT_DIR/postgres.log"}"

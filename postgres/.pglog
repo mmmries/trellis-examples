@@ -1,0 +1,97 @@
+2026-09-13 14:54:34.769 PDT [92196] LOG:  starting PostgreSQL 18.2 on aarch64-apple-darwin25.3.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+2026-09-13 14:54:34.771 PDT [92196] LOG:  listening on IPv6 address "::1", port 5430
+2026-09-13 14:54:34.771 PDT [92196] LOG:  listening on IPv4 address "127.0.0.1", port 5430
+2026-09-13 14:54:34.771 PDT [92196] LOG:  listening on Unix socket "/Users/mries/code/trellis-examples/postgres/.pgsock/.s.PGSQL.5430"
+2026-09-13 14:54:34.774 PDT [92202] LOG:  database system was shut down at 2026-09-13 14:54:34 PDT
+2026-09-13 14:54:34.776 PDT [92196] LOG:  database system is ready to accept connections
+2026-09-13 14:54:34.921 PDT [92210] FATAL:  role "mries" does not exist
+2026-09-13 14:54:52.277 PDT [92196] LOG:  received fast shutdown request
+2026-09-13 14:54:52.278 PDT [92196] LOG:  aborting any active transactions
+2026-09-13 14:54:52.279 PDT [92196] LOG:  background worker "logical replication launcher" (PID 92205) exited with exit code 1
+2026-09-13 14:54:52.279 PDT [92200] LOG:  shutting down
+2026-09-13 14:54:52.280 PDT [92200] LOG:  checkpoint starting: shutdown immediate
+2026-09-13 14:54:52.281 PDT [92200] LOG:  checkpoint complete: wrote 0 buffers (0.0%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.001 s, sync=0.001 s, total=0.002 s; sync files=2, longest=0.001 s, average=0.001 s; distance=0 kB, estimate=0 kB; lsn=0/178B0B0, redo lsn=0/178B0B0
+2026-09-13 14:54:52.283 PDT [92196] LOG:  database system is shut down
+2026-09-13 14:54:53.170 PDT [92302] LOG:  starting PostgreSQL 18.2 on aarch64-apple-darwin25.3.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+2026-09-13 14:54:53.171 PDT [92302] LOG:  listening on IPv6 address "::1", port 5430
+2026-09-13 14:54:53.171 PDT [92302] LOG:  listening on IPv4 address "127.0.0.1", port 5430
+2026-09-13 14:54:53.171 PDT [92302] LOG:  listening on Unix socket "/Users/mries/code/trellis-examples/postgres/.pgsock/.s.PGSQL.5430"
+2026-09-13 14:54:53.175 PDT [92308] LOG:  database system was shut down at 2026-09-13 14:54:53 PDT
+2026-09-13 14:54:53.176 PDT [92302] LOG:  database system is ready to accept connections
+2026-09-13 14:54:53.307 PDT [92316] FATAL:  role "mries" does not exist
+2026-09-13 14:55:11.042 PDT [92302] LOG:  received fast shutdown request
+2026-09-13 14:55:11.043 PDT [92302] LOG:  aborting any active transactions
+2026-09-13 14:55:11.044 PDT [92302] LOG:  background worker "logical replication launcher" (PID 92311) exited with exit code 1
+2026-09-13 14:55:11.044 PDT [92306] LOG:  shutting down
+2026-09-13 14:55:11.044 PDT [92306] LOG:  checkpoint starting: shutdown immediate
+2026-09-13 14:55:11.066 PDT [92306] LOG:  checkpoint complete: wrote 955 buffers (5.8%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.013 s, sync=0.009 s, total=0.022 s; sync files=303, longest=0.001 s, average=0.001 s; distance=4441 kB, estimate=4441 kB; lsn=0/1BE1528, redo lsn=0/1BE1528
+2026-09-13 14:55:11.070 PDT [92302] LOG:  database system is shut down
+2026-09-13 14:55:11.902 PDT [92416] LOG:  starting PostgreSQL 18.2 on aarch64-apple-darwin25.3.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+2026-09-13 14:55:11.903 PDT [92416] LOG:  listening on IPv6 address "::1", port 5430
+2026-09-13 14:55:11.903 PDT [92416] LOG:  listening on IPv4 address "127.0.0.1", port 5430
+2026-09-13 14:55:11.904 PDT [92416] LOG:  listening on Unix socket "/Users/mries/code/trellis-examples/postgres/.pgsock/.s.PGSQL.5430"
+2026-09-13 14:55:11.907 PDT [92422] LOG:  database system was shut down at 2026-09-13 14:55:11 PDT
+2026-09-13 14:55:11.908 PDT [92416] LOG:  database system is ready to accept connections
+2026-09-13 14:55:12.039 PDT [92430] FATAL:  role "mries" does not exist
+2026-09-13 15:00:11.905 PDT [92420] LOG:  checkpoint starting: time
+2026-09-13 15:00:50.652 PDT [92420] LOG:  checkpoint complete: wrote 376 buffers (2.3%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=38.735 s, sync=0.010 s, total=38.748 s; sync files=361, longest=0.004 s, average=0.001 s; distance=4959 kB, estimate=4959 kB; lsn=0/1F7EE228, redo lsn=0/1C62DA8
+2026-09-13 15:00:53.273 PDT [92420] LOG:  checkpoint starting: wal
+2026-09-13 15:01:10.366 PDT [92420] LOG:  checkpoint complete: wrote 856 buffers (5.2%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 33 recycled; write=17.028 s, sync=0.061 s, total=17.094 s; sync files=13, longest=0.052 s, average=0.005 s; distance=528725 kB, estimate=528725 kB; lsn=0/404AA980, redo lsn=0/220B8388
+2026-09-13 15:01:11.173 PDT [92420] LOG:  checkpoints are occurring too frequently (18 seconds apart)
+2026-09-13 15:01:11.173 PDT [92420] HINT:  Consider increasing the configuration parameter "max_wal_size".
+2026-09-13 15:01:11.173 PDT [92420] LOG:  checkpoint starting: wal
+2026-09-13 15:01:15.732 PDT [92420] LOG:  checkpoint complete: wrote 6010 buffers (36.7%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 33 recycled; write=4.465 s, sync=0.091 s, total=4.559 s; sync files=9, longest=0.053 s, average=0.011 s; distance=540166 kB, estimate=540166 kB; lsn=0/61BF7A50, redo lsn=0/43039EA8
+2026-09-13 15:01:16.209 PDT [92420] LOG:  checkpoints are occurring too frequently (5 seconds apart)
+2026-09-13 15:01:16.209 PDT [92420] HINT:  Consider increasing the configuration parameter "max_wal_size".
+2026-09-13 15:01:16.210 PDT [92420] LOG:  checkpoint starting: wal
+2026-09-13 15:01:20.774 PDT [92420] LOG:  checkpoint complete: wrote 5906 buffers (36.0%), wrote 0 SLRU buffers; 0 WAL file(s) added, 0 removed, 33 recycled; write=4.560 s, sync=0.001 s, total=4.565 s; sync files=6, longest=0.001 s, average=0.001 s; distance=542233 kB, estimate=542233 kB; lsn=0/81F11EC0, redo lsn=0/641C0508
+2026-09-13 15:01:22.001 PDT [92420] LOG:  checkpoints are occurring too frequently (6 seconds apart)
+2026-09-13 15:01:22.001 PDT [92420] HINT:  Consider increasing the configuration parameter "max_wal_size".
+2026-09-13 15:01:22.001 PDT [92420] LOG:  checkpoint starting: wal
+2026-09-13 15:01:34.475 PDT [92420] LOG:  checkpoint complete: wrote 3652 buffers (22.3%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 33 recycled; write=12.331 s, sync=0.140 s, total=12.475 s; sync files=18, longest=0.121 s, average=0.008 s; distance=542344 kB, estimate=542344 kB; lsn=0/A311C1D0, redo lsn=0/85362778
+2026-09-13 15:01:36.988 PDT [92420] LOG:  checkpoints are occurring too frequently (14 seconds apart)
+2026-09-13 15:01:36.988 PDT [92420] HINT:  Consider increasing the configuration parameter "max_wal_size".
+2026-09-13 15:01:36.988 PDT [92420] LOG:  checkpoint starting: wal
+2026-09-13 15:02:00.031 PDT [92420] LOG:  checkpoint complete: wrote 1744 buffers (10.6%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 33 recycled; write=22.991 s, sync=0.049 s, total=23.044 s; sync files=18, longest=0.035 s, average=0.003 s; distance=539921 kB, estimate=542102 kB; lsn=0/C3F449B0, redo lsn=0/A62A6D68
+2026-09-13 15:02:02.489 PDT [92420] LOG:  checkpoints are occurring too frequently (26 seconds apart)
+2026-09-13 15:02:02.489 PDT [92420] HINT:  Consider increasing the configuration parameter "max_wal_size".
+2026-09-13 15:02:02.489 PDT [92420] LOG:  checkpoint starting: wal
+2026-09-13 15:02:20.592 PDT [92420] LOG:  checkpoint complete: wrote 3794 buffers (23.2%), wrote 0 SLRU buffers; 0 WAL file(s) added, 0 removed, 33 recycled; write=18.099 s, sync=0.002 s, total=18.104 s; sync files=11, longest=0.001 s, average=0.001 s; distance=540638 kB, estimate=541955 kB; lsn=0/E4EF1230, redo lsn=0/C729E7B8
+2026-09-13 15:02:23.261 PDT [92420] LOG:  checkpoints are occurring too frequently (21 seconds apart)
+2026-09-13 15:02:23.261 PDT [92420] HINT:  Consider increasing the configuration parameter "max_wal_size".
+2026-09-13 15:02:23.261 PDT [92420] LOG:  checkpoint starting: wal
+2026-09-13 15:02:45.921 PDT [92420] LOG:  checkpoint complete: wrote 6674 buffers (40.7%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 33 recycled; write=22.598 s, sync=0.059 s, total=22.661 s; sync files=11, longest=0.042 s, average=0.006 s; distance=541150 kB, estimate=541875 kB; lsn=1/63D8820, redo lsn=0/E8316330
+2026-09-13 15:02:47.933 PDT [92420] LOG:  checkpoints are occurring too frequently (24 seconds apart)
+2026-09-13 15:02:47.933 PDT [92420] HINT:  Consider increasing the configuration parameter "max_wal_size".
+2026-09-13 15:02:47.933 PDT [92420] LOG:  checkpoint starting: wal
+2026-09-13 15:03:03.218 PDT [93422] ERROR:  canceling statement due to user request
+2026-09-13 15:03:03.218 PDT [93422] CONTEXT:  SQL statement "SELECT 1 FROM ONLY "public"."posts" x WHERE "id" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x"
+2026-09-13 15:03:03.218 PDT [93422] STATEMENT:  with author_pool as (
+	  select array_agg(id) as ids, count(*) as n from public.authors
+	)
+	insert into public.comments (post, author, body, created_at)
+	select
+	  p.id,
+	  ap.ids[1 + floor(random() * ap.n)::int],
+	  pg_temp.lorem_words(3 + floor(random() * 20)::int),
+	  p.created_at + (random() * (now() - p.created_at))
+	from public.posts p
+	cross join author_pool ap
+	cross join lateral generate_series(
+	  1, floor(power(random(), 2) * 15 + hashtext(p.id::text) * 0)::int
+	) gs;
+2026-09-13 15:03:09.754 PDT [92420] LOG:  checkpoint complete: wrote 26 buffers (0.2%), wrote 0 SLRU buffers; 0 WAL file(s) added, 0 removed, 33 recycled; write=21.814 s, sync=0.004 s, total=21.822 s; sync files=32, longest=0.001 s, average=0.001 s; distance=540524 kB, estimate=541740 kB; lsn=1/2707D1E8, redo lsn=1/92F13D8
+2026-09-13 15:03:11.363 PDT [92420] LOG:  checkpoints are occurring too frequently (24 seconds apart)
+2026-09-13 15:03:11.363 PDT [92420] HINT:  Consider increasing the configuration parameter "max_wal_size".
+2026-09-13 15:03:11.363 PDT [92420] LOG:  checkpoint starting: wal
+2026-09-13 15:07:41.095 PDT [92420] LOG:  checkpoint complete: wrote 4575 buffers (27.9%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 33 recycled; write=269.699 s, sync=0.018 s, total=269.733 s; sync files=164, longest=0.002 s, average=0.001 s; distance=539059 kB, estimate=541472 kB; lsn=1/37F81938, redo lsn=1/2A15E050
+2026-09-13 15:11:56.862 PDT [95332] LOG:  logical decoding found consistent point at 1/38194170
+2026-09-13 15:11:56.862 PDT [95332] DETAIL:  There are no running transactions.
+2026-09-13 15:11:56.862 PDT [95332] STATEMENT:  select lsn from pg_create_logical_replication_slot($1, 'pgoutput')
+2026-09-13 15:11:56.960 PDT [95336] LOG:  starting logical decoding for slot "trellis_slot"
+2026-09-13 15:11:56.960 PDT [95336] DETAIL:  Streaming transactions committing after 1/381941A8, reading WAL from 1/38194170.
+2026-09-13 15:11:56.960 PDT [95336] STATEMENT:  START_REPLICATION SLOT trellis_slot LOGICAL 0/0 (proto_version '1', publication_names 'trellis_pub', messages 'true')
+2026-09-13 15:11:56.960 PDT [95336] LOG:  logical decoding found consistent point at 1/38194170
+2026-09-13 15:11:56.960 PDT [95336] DETAIL:  There are no running transactions.
+2026-09-13 15:11:56.960 PDT [95336] STATEMENT:  START_REPLICATION SLOT trellis_slot LOGICAL 0/0 (proto_version '1', publication_names 'trellis_pub', messages 'true')
+2026-09-13 15:13:11.095 PDT [92420] LOG:  checkpoint starting: time
