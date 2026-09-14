@@ -7,21 +7,23 @@ A quick POC that can be run locally to understand the capabilities of trellis.
 * Download a trellis CLI binary from the [trellis](https://github.com/salesforce-misc/trellis/releases) project and put it in this directory
 * You should have the postgres commands available in your `$PATH`
 
-## Planned Demo Workflow
+## Setup
 
-Start a shell within this directory and then run the following
+Start a shell within this directory and then run the following to get a local postgres database
+and pre-fill it with some pseudo-random authors, posts, comments and tag data.
 
 ```shell
 ../postgres/pg-start.sh
 source ../postgres/env.sh
 ./load-schema.sh
-./gen-data.sh 100000
+./gen-data.sh 1000000
 ```
 
-Now you an inspect the postgres cluster using `psql`, or a visual tool like beekeper.
+## Finding the Most Prolific Authors
+
+Now you can inspect the postgres cluster using `psql`, or a visual tool like beekeper.
 
 ```shell
-cargo run --bin defctl -- migrate
 ./trellis define "RELATIONSHIP posts FROM authors.id TO posts.author"
 ./trellis define "RELATIONSHIP comments FROM authors.id TO comments.author"
 ./trellis define "TRANSFORM authors_calc FROM authors SELECT count(posts.id) AS post_count, coalesce(sum(posts.word_count), 0) AS total_posted_words, count(comments.id) AS comment_count, coalesce(sum(comments.word_count), 0) AS total_commented_words, post_count + comment_count AS total_publishes, total_posted_words + total_commented_words AS total_words"
@@ -113,3 +115,44 @@ INSERT INTO posts (author, title, body) VALUES (<author-id>, 'title', 'three mor
 ```
 
 Now re-run the top-10 author query and you can see the updated data which we continously manintain by subscribing the logical replication and update only the rows that need to be maintained.
+
+## Most Common Tags
+
+Another use-case that is difficult to optimize with indexes is aggregating across multiple rows in the same table.
+Trellis can help us here as well.
+
+```sql
+SELECT
+    pt.tag,
+    SUM(p.word_count) AS total_words,
+    COUNT(*) AS post_count
+FROM public.post_tags pt
+JOIN public.posts p ON p.id = pt.post
+GROUP BY pt.tag
+ORDER BY total_words DESC
+LIMIT 10;
+```
+
+This will tell us which tags are most common by number of posts and/or by word count.
+We have the right basic indexes in-place like indexing posts on `id` so the join can be efficient, but we still have to lookup all of those individual word counts for each row in the `post_tags` table and then add them together when we do the grouping.
+
+
+```
+./trellis define "RELATIONSHIP post FROM post_tags.post TO posts.id"
+./trellis define "TRANSFORM tag_totals FROM post_tags GROUP BY tag SELECT COUNT(*) AS post_count, SUM(post.word_count) AS total_words"
+./trellis run
+```
+
+Now Trellis will create a table called `tag_totals` where is will create 1 row per unique tag.
+It will track which `post_tags` fall into each row of the totals table, and maintain a post count and a total word count on that table.
+
+```sql
+SELECT tag, post_count, total_words
+FROM tag_totals
+ORDER BY total_words DESC
+LIMIT 10;
+```
+
+On my machine, this simple query doesn't even need an index at all.
+Since there are a relatively small number of tags, the whole table fits easily in-memory and takes around `0.1ms` to execute the query, compared to the ~280ms of the join-group query above.
+
