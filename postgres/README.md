@@ -9,6 +9,9 @@ to be on your `PATH`.
 - `./pg-stop.sh` — stops the cluster.
 - `./pg-reset.sh` — stops the cluster, deletes all data, and starts a fresh
   one.
+- `./pg-cleanup.sh` — stops the cluster and removes all artifacts (data
+  directory, socket, logs), for wiping your machine clean when you're done
+  with the examples.
 
 Data lives in `postgres/data` (git-ignored) and the server log in
 `postgres/postgres.log`. Connect with:
@@ -17,5 +20,7 @@ Data lives in `postgres/data` (git-ignored) and the server log in
 psql -h postgres/data -p 5430 postgres
 ```
 
-Override the port or data directory by exporting `PGPORT` / `PGDATA` before
-running a script, e.g. `PGPORT=5555 ./pg-start.sh`.
+All paths are anchored to this directory, regardless of where a script is
+invoked from, so every example in this repo shares one cluster and one
+cleanup location. Override the port by exporting `PGPORT` before running a
+script, e.g. `PGPORT=5555 ./pg-start.sh`.

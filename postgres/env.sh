@@ -6,10 +6,10 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 export PGPORT="${PGPORT:-5430}"
-export PGDATA="${PGDATA:-"$SCRIPT_DIR/data"}"
+export PGDATA="$SCRIPT_DIR/data"
 export PGSOCK="$SCRIPT_DIR/.pgsock"
 export PGLOG="$SCRIPT_DIR/.pglog"
-export PGHOST="${PGHOST:-"$PGDATA"}"
+export PGHOST="$PGDATA"
 export DBNAME=trellis_poc
 export LOCAL_DATABASE_URL="postgresql://postgres@localhost:${PGPORT}/${DBNAME}"
 export TRELLIS_DATABASE_URL=$LOCAL_DATABASE_URL
