@@ -217,6 +217,7 @@ CREATE INDEX post_tags_tag_idx ON public.post_tags USING btree (tag);
 
 ALTER TABLE posts REPLICA IDENTITY FULL;
 ALTER TABLE comments REPLICA IDENTITY FULL;
+ALTER TABLE post_tags REPLICA IDENTITY FULL;
 
 --
 -- PostgreSQL database dump complete

@@ -16,8 +16,11 @@ and pre-fill it with some pseudo-random authors, posts, comments and tag data.
 ../postgres/pg-start.sh
 source ../postgres/env.sh
 ./load-schema.sh
-./gen-data.sh 1000000
+./gen-data.sh 10000000
 ```
+
+> The timing numbers below were measured with 10M posts, but this takes several minutes to generate
+> you can take off a couple of zeros if you just want to walk through the process without waiting.
 
 ## Finding the Most Prolific Authors
 
@@ -55,6 +58,8 @@ GROUP BY a.id, a.name
 ORDER BY posted_words DESC LIMIT 10;
 ```
 
+This query takes ~4.8sec when warm on my machine.
+
 I can similarly aggregate across the comments table or do both at once with some common-table expressions
 
 ```sql
@@ -83,6 +88,8 @@ ORDER BY total_words DESC
 LIMIT 10;
 ```
 
+This query takes ~7.8sec when warm on my machine.
+
 But with the pre-computed aggregate table, I can get this same answer much more efficiently
 
 ```sql
@@ -93,7 +100,7 @@ ORDER BY ac.total_words DESC
 LIMIT 10;
 ```
 
-This runs much faster because the aggregated counts and cross-table totals are both calculated and future writes into either table will incrementally update just the aggregated rows that they apply to.
+This query takes ~220ms (35x faster) because the aggregated counts and cross-table totals are both calculated and future writes into either table will incrementally update just the aggregated rows that they apply to.
 
 And because this is just a regular postgres table, we can define a standard index.
 
@@ -102,7 +109,7 @@ CREATE INDEX author_total_words ON authors_calc (total_words);
 ```
 
 And if we apply a simple index, the query above is even faster.
-If we look at `EXPLAIN ANALYZE` the actual execution time is less than a millisecond.
+If we look at `EXPLAIN ANALYZE` the actual execution time is ~0.13ms (60,000x faster).
 
 The query is also a lot easier to read/understand. It's the same data as the expensive query, guaranteed correct, no race conditions, no data pipeline that needs to be built, no missed application messages to catch up on.
 
@@ -135,6 +142,7 @@ LIMIT 10;
 
 This will tell us which tags are most common by number of posts and/or by word count.
 We have the right basic indexes in-place like indexing posts on `id` so the join can be efficient, but we still have to lookup all of those individual word counts for each row in the `post_tags` table and then add them together when we do the grouping.
+This takes ~2.5s on my machine.
 
 
 ```
@@ -154,5 +162,5 @@ LIMIT 10;
 ```
 
 On my machine, this simple query doesn't even need an index at all.
-Since there are a relatively small number of tags, the whole table fits easily in-memory and takes around `0.1ms` to execute the query, compared to the ~280ms of the join-group query above.
+Since there are a relatively small number of tags, the whole table fits easily in-memory and takes around `0.04ms` to execute the query (62,500x faster than the query above).
 
