@@ -1,14 +1,19 @@
--- Populates public.authors/posts/post_tags/comments with a representative,
--- pseudo-random sample sized off :posts (set via `psql -v posts=<n>`).
+-- Adds a representative, pseudo-random sample of :posts posts (plus their
+-- authors/tags/comments) on top of whatever is already in the tables --
+-- safe to re-run repeatedly to seed the environment and then keep feeding
+-- it new data for latency/throughput monitoring. Writes happen in batches
+-- of :batch_size posts at a time, each its own transaction, so one run
+-- doesn't build up a single huge transaction that exceeds the WAL size
+-- limit.
 --
--- Usage: psql -v posts=500 -f gen-data.sql
+-- Usage: psql -v posts=500 -v batch_size=500 -f gen-data.sql
 \set ON_ERROR_STOP on
 
--- Author pool scales with post volume, floor of 5 so small runs still look
--- like more than one person posting.
+-- Author pool scales with this invocation's post volume, floor of 5 so
+-- small runs still look like more than one person posting. The top-up
+-- loop below only adds authors until the existing count clears this bar,
+-- so repeated invocations grow the pool instead of resetting it.
 select greatest(5, (:posts) / 20) as num_authors \gset
-
-truncate table public.comments, public.post_tags, public.posts, public.authors cascade;
 
 -- Session-local helpers (pg_temp; dropped automatically when this script's
 -- connection closes, so nothing leaks into the schema).
@@ -76,56 +81,91 @@ begin
   end loop;
 end $$;
 
--- Posts: one random author each, timestamps spread over the last 180 days.
-with author_pool as (
-  select array_agg(id) as ids, count(*) as n from public.authors
-)
-insert into public.posts (author, title, body, created_at)
-select
-  ap.ids[1 + floor(random() * ap.n)::int],
-  initcap(pg_temp.lorem_words(2 + floor(random() * 5)::int)),
-  pg_temp.lorem_words(20 + floor(random() * 60)::int),
-  now() - (random() * interval '180 days')
-from generate_series(1, :posts), author_pool ap;
+-- Posts (+ their tags and comments): generated :batch_size at a time, each
+-- batch its own committed transaction, so a single invocation never holds
+-- open one transaction spanning all of :posts. A plpgsql *procedure* is
+-- used (not a DO block) because only procedures are allowed to COMMIT
+-- mid-loop. `batch_posts` holds just the ids from the current batch, so
+-- the tags/comments inserts below only ever touch this batch's rows —
+-- important now that public.posts isn't truncated first, since scanning
+-- all of public.posts here would re-tag/re-comment every post left over
+-- from earlier invocations on every run.
+create procedure pg_temp.generate_posts(total int, batch_size int)
+language plpgsql as $$
+declare
+  remaining int := total;
+  this_batch int;
+begin
+  create temporary table batch_posts (id bigint, created_at timestamptz);
 
--- Tags: 0-4 picks per post, deduped (some collide, which is fine — most
--- posts land at 1-2 distinct tags, matching real hashtag usage).
---
--- `+ hashtext(p.id::text) * 0` is load-bearing, not a no-op: a bound
--- expression that doesn't syntactically reference the outer row gets
--- constant-folded by the planner into a plain (non-LATERAL) join, so
--- generate_series's random() is evaluated ONCE for the whole query and
--- every post gets the same tag count. (A `WHERE p.id IS NOT NULL` guard
--- does NOT fix this — the planner proves that's always true, since id is
--- the primary key, and discards it before it can force correlation.)
--- Multiplying a real per-row value by zero can't be proven irrelevant, so
--- the planner is forced to keep this genuinely LATERAL and re-evaluate
--- random() for every post.
-insert into public.post_tags (post, tag)
-select p.id, t.tag
-from public.posts p
-cross join lateral (
-  select distinct pg_temp.random_tag() as tag
-  from generate_series(1, floor(random() * 5 + hashtext(p.id::text) * 0)::int)
-) t;
+  while remaining > 0 loop
+    this_batch := least(batch_size, remaining);
+    truncate batch_posts;
 
--- Comments: skewed toward few per post (power(random(),2) biases low),
--- occasional post gets a longer thread. Same forced-correlation trick as
--- post_tags above.
-with author_pool as (
-  select array_agg(id) as ids, count(*) as n from public.authors
-)
-insert into public.comments (post, author, body, created_at)
-select
-  p.id,
-  ap.ids[1 + floor(random() * ap.n)::int],
-  pg_temp.lorem_words(3 + floor(random() * 20)::int),
-  p.created_at + (random() * (now() - p.created_at))
-from public.posts p
-cross join author_pool ap
-cross join lateral generate_series(
-  1, floor(power(random(), 2) * 15 + hashtext(p.id::text) * 0)::int
-) gs;
+    -- Posts: one random author each, timestamps spread over the last 180
+    -- days.
+    with author_pool as (
+      select array_agg(id) as ids, count(*) as n from public.authors
+    ), inserted as (
+      insert into public.posts (author, title, body, created_at)
+      select
+        ap.ids[1 + floor(random() * ap.n)::int],
+        initcap(pg_temp.lorem_words(2 + floor(random() * 5)::int)),
+        pg_temp.lorem_words(20 + floor(random() * 60)::int),
+        now() - (random() * interval '180 days')
+      from generate_series(1, this_batch), author_pool ap
+      returning id, created_at
+    )
+    insert into batch_posts select * from inserted;
+
+    -- Tags: 0-4 picks per post, deduped (some collide, which is fine —
+    -- most posts land at 1-2 distinct tags, matching real hashtag usage).
+    --
+    -- `+ hashtext(p.id::text) * 0` is load-bearing, not a no-op: a bound
+    -- expression that doesn't syntactically reference the outer row gets
+    -- constant-folded by the planner into a plain (non-LATERAL) join, so
+    -- generate_series's random() is evaluated ONCE for the whole query and
+    -- every post gets the same tag count. (A `WHERE p.id IS NOT NULL`
+    -- guard does NOT fix this — the planner proves that's always true,
+    -- since id is the primary key, and discards it before it can force
+    -- correlation.) Multiplying a real per-row value by zero can't be
+    -- proven irrelevant, so the planner is forced to keep this genuinely
+    -- LATERAL and re-evaluate random() for every post.
+    insert into public.post_tags (post, tag)
+    select p.id, t.tag
+    from batch_posts p
+    cross join lateral (
+      select distinct pg_temp.random_tag() as tag
+      from generate_series(1, floor(random() * 5 + hashtext(p.id::text) * 0)::int)
+    ) t;
+
+    -- Comments: skewed toward few per post (power(random(),2) biases low),
+    -- occasional post gets a longer thread. Same forced-correlation trick
+    -- as post_tags above.
+    with author_pool as (
+      select array_agg(id) as ids, count(*) as n from public.authors
+    )
+    insert into public.comments (post, author, body, created_at)
+    select
+      p.id,
+      ap.ids[1 + floor(random() * ap.n)::int],
+      pg_temp.lorem_words(3 + floor(random() * 20)::int),
+      p.created_at + (random() * (now() - p.created_at))
+    from batch_posts p
+    cross join author_pool ap
+    cross join lateral generate_series(
+      1, floor(power(random(), 2) * 15 + hashtext(p.id::text) * 0)::int
+    ) gs;
+
+    remaining := remaining - this_batch;
+    commit;
+  end loop;
+
+  drop table batch_posts;
+end;
+$$;
+
+call pg_temp.generate_posts(:posts, :batch_size);
 
 analyze public.authors, public.posts, public.post_tags, public.comments;
 
