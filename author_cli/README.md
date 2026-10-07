@@ -16,7 +16,7 @@ and pre-fill it with some pseudo-random authors, posts, comments and tag data.
 ../postgres/pg-start.sh
 source ../postgres/env.sh
 ./load-schema.sh
-./gen-data.sh 10000000
+./gen-data.sh 100000
 ```
 
 > The timing numbers below were measured with 10M posts, but this takes several minutes to generate
@@ -30,7 +30,7 @@ Now you can inspect the postgres cluster using `psql`, or a visual tool like bee
 ./trellis define "RELATIONSHIP posts FROM authors.id TO posts.author"
 ./trellis define "RELATIONSHIP comments FROM authors.id TO comments.author"
 ./trellis define "TRANSFORM authors_calc FROM authors SELECT count(posts.id) AS post_count, coalesce(sum(posts.word_count), 0) AS total_posted_words, count(comments.id) AS comment_count, coalesce(sum(comments.word_count), 0) AS total_commented_words, post_count + comment_count AS total_publishes, total_posted_words + total_commented_words AS total_words"
-./trellis run
+./trellis run --prometheus-bind 127.0.0.1:9988
 ```
 
 Formatted transform for readability
@@ -148,10 +148,10 @@ This takes ~2.5s on my machine.
 ```
 ./trellis define "RELATIONSHIP post FROM post_tags.post TO posts.id"
 ./trellis define "TRANSFORM tag_totals FROM post_tags GROUP BY tag SELECT COUNT(*) AS post_count, SUM(post.word_count) AS total_words"
-./trellis run
+./trellis run --prometheus-bind 127.0.0.1:9988
 ```
 
-Now Trellis will create a table called `tag_totals` where is will create 1 row per unique tag.
+Now Trellis will create a table called `tag_totals` where it will create 1 row per unique tag.
 It will track which `post_tags` fall into each row of the totals table, and maintain a post count and a total word count on that table.
 
 ```sql
@@ -164,3 +164,19 @@ LIMIT 10;
 On my machine, this simple query doesn't even need an index at all.
 Since there are a relatively small number of tags, the whole table fits easily in-memory and takes around `0.04ms` to execute the query (62,500x faster than the query above).
 
+And if we pick one of these tags, we can add it to 10 more posts with the query below.
+
+```sql
+INSERT INTO post_tags (post, tag)
+SELECT p.id, 'your-tag'
+FROM posts p
+WHERE NOT EXISTS (
+    SELECT 1 FROM post_tags pt
+    WHERE pt.post = p.id AND pt.tag = 'your-tag'
+)
+ORDER BY random()
+LIMIT 10;
+```
+
+Now you can check localhost:9988 in a browser tab and see the stats for how long it takes for data changes to propogate through the transforms.
+On my machine it takes between 250ms and 500ms for new writes to show up in the transforms.

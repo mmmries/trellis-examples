@@ -212,13 +212,6 @@ CREATE INDEX comments_author_idx ON public.comments USING btree (author);
 
 CREATE INDEX post_tags_tag_idx ON public.post_tags USING btree (tag);
 
--- Manually added
--- Change replica identities to support aggregate transforms with incremental maintenance
-
-ALTER TABLE posts REPLICA IDENTITY FULL;
-ALTER TABLE comments REPLICA IDENTITY FULL;
-ALTER TABLE post_tags REPLICA IDENTITY FULL;
-
 --
 -- PostgreSQL database dump complete
 --
