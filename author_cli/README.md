@@ -16,10 +16,10 @@ and pre-fill it with some pseudo-random authors, posts, comments and tag data.
 ../postgres/pg-start.sh
 source ../postgres/env.sh
 ./load-schema.sh
-./gen-data.sh 100000
+./gen-data.sh 1000000
 ```
 
-> The timing numbers below were measured with 10M posts, but this takes several minutes to generate
+> The timing numbers below were measured with 1M posts, but this takes several minutes to generate
 > you can take off a couple of zeros if you just want to walk through the process without waiting.
 
 ## Finding the Most Prolific Authors
@@ -27,26 +27,22 @@ source ../postgres/env.sh
 Now you can inspect the postgres cluster using `psql`, or a visual tool like beekeper.
 
 ```shell
-./trellis define "RELATIONSHIP posts FROM authors.id TO posts.author"
-./trellis define "RELATIONSHIP comments FROM authors.id TO comments.author"
-./trellis define "TRANSFORM authors_calc FROM authors SELECT count(posts.id) AS post_count, coalesce(sum(posts.word_count), 0) AS total_posted_words, count(comments.id) AS comment_count, coalesce(sum(comments.word_count), 0) AS total_commented_words, post_count + comment_count AS total_publishes, total_posted_words + total_commented_words AS total_words"
-./trellis run --prometheus-bind 127.0.0.1:9988
+./trellis define "TRANSFORM post_agg FROM posts GROUP BY author SELECT COUNT(*) AS post_count, SUM(word_count) AS word_total"
+./trellis define "TRANSFORM comment_agg FROM comments GROUP BY author SELECT COUNT(*) AS comment_count, SUM(word_count) AS word_total"
+./trellis run
 ```
 
 Formatted transform for readability
 
 ```
-TRANSFORM authors_calc
-FROM authors
-SELECT count(posts.id) AS post_count,
-       coalesce(sum(posts.word_count), 0) AS total_posted_words,
-       count(comments.id) AS comment_count,
-       coalesce(sum(comments.word_count), 0) AS total_commented_words,
-       post_count + comment_count AS total_publishes,
-       total_posted_words + total_commented_words AS total_words
+TRANSFORM post_agg
+FROM posts
+GROUP BY author
+SELECT COUNT(*) AS post_count, SUM(word_count) AS word_total
 ```
 
-You can see that we're defining a new table called `authors_calc` which will have the same primary key and have a 1-to-1 relationship with `authors`, but we're also bringing in related data from `posts` and `comments`.
+These two transforms are pre-counting and pre-summing the number of posts, comments and words in the two tables.
+This way when we query this data, we can interact with this data without needing to load many rows from these detail tables.
 
 Let's explore the data a bit. Here's a query we can use to find the top 10 authors by how many words they have in their `posts`.
 
@@ -58,9 +54,42 @@ GROUP BY a.id, a.name
 ORDER BY posted_words DESC LIMIT 10;
 ```
 
-This query takes ~4.8sec when warm on my machine.
+This query takes ~400ms when warm on my machine.
 
-I can similarly aggregate across the comments table or do both at once with some common-table expressions
+I can now get this same answer by joining to the aggregated table like this.
+
+```sql
+SELECT a.id, a.name, p.post_count, p.word_total AS posted_words
+FROM post_agg p
+JOIN authors a ON a.id = p.author
+ORDER BY p.word_total DESC LIMIT 10;
+```
+
+This query takes ~36ms (11x faster) when warm on my machine because the word totals are already summed per author, so postgres just has to read those sums and compare them.
+
+And because this is just a regular postgres table, we can define a standard index.
+
+```sql
+CREATE INDEX post_total_words ON post_agg (word_total);
+```
+
+And if we apply a simple index, the query above is even faster.
+If we look at `EXPLAIN ANALYZE` the actual execution time is ~0.12ms (3,333x faster).
+
+The query is also a lot easier to read/understand. It's the same data as the expensive query, guaranteed correct, no race conditions, no data pipeline that needs to be built, no missed application messages to catch up on.
+
+And this is not only about speed of reads, but also the efficiency of maintaining this data shape.
+If we used materialized views + `REFRESH...CONCURRENTLY` we could accomplish fast reads, but the latency and resource cost of that maintenance would still include many repeated calculations.
+Trellis incrementally maintains its data tables, so we can take the results of our top 10 authors query above, insert one new row of data and then query our table and see that the counts have changed almost immediately.
+We'll test this later, but first let's talk about cross-table data.
+
+
+## Words Across Tables
+
+The example above highlights the ways that Trellis can maintain values computed across multiple rows of the same table.
+Trellis is also helpful when you want to analyze data across multiple tables, which an index can't do.
+Let's start with a question of which authors are most prolific across both their posts and their comments.
+Here is the vanilla SQL way to answer this question:
 
 ```sql
 WITH author_posts AS (
@@ -88,95 +117,63 @@ ORDER BY total_words DESC
 LIMIT 10;
 ```
 
-This query takes ~7.8sec when warm on my machine.
+This takes 571ms on my machine when warmed and can't be improved with any index since Postgres has to sum and then add sums together in order to get the total before it can sort them.
+With Trellis we will use a JOIN across our existing aggregated transforms.
 
-But with the pre-computed aggregate table, I can get this same answer much more efficiently
-
-```sql
-SELECT a.id, a.name, ac.post_count, ac.total_posted_words, ac.comment_count, ac.total_commented_words, ac.total_words
-FROM authors a
-INNER JOIN authors_calc ac ON ac.id = a.id
-ORDER BY ac.total_words DESC
-LIMIT 10;
+```
+./trellis define "TRANSFORM author_agg FROM comment_agg JOIN post_agg ON post_agg.author = comment_agg.author GROUP BY post_agg.author SELECT SUM(comment_agg.word_total) AS commented_words, SUM(post_agg.word_total) as posted_words, SUM(comment_agg.word_total) + SUM(post_agg.word_total) AS word_total"
+./trellis run
 ```
 
-This query takes ~220ms (35x faster) because the aggregated counts and cross-table totals are both calculated and future writes into either table will incrementally update just the aggregated rows that they apply to.
-
-And because this is just a regular postgres table, we can define a standard index.
-
-```sql
-CREATE INDEX author_total_words ON authors_calc (total_words);
-```
-
-And if we apply a simple index, the query above is even faster.
-If we look at `EXPLAIN ANALYZE` the actual execution time is ~0.13ms (60,000x faster).
-
-The query is also a lot easier to read/understand. It's the same data as the expensive query, guaranteed correct, no race conditions, no data pipeline that needs to be built, no missed application messages to catch up on.
-
-And this is not only about speed of reads, but also the efficiency of maintaining this data shape.
-If we used materialized views + `REFRESH...CONCURRENTLY` we could accomplish fast reads, but the latency and resource cost of that maintenance would still include many repeated calculations.
-Trellis incrementally maintains its data tables, so we can take the results of our top 10 authors query above, insert one new row of data and then query our table and see that the counts have changed almost immediately.
-
-```sql
-INSERT INTO posts (author, title, body) VALUES (<author-id>, 'title', 'three more words');
-```
-
-Now re-run the top-10 author query and you can see the updated data which we continously manintain by subscribing the logical replication and update only the rows that need to be maintained.
-
-## Most Common Tags
-
-Another use-case that is difficult to optimize with indexes is aggregating across multiple rows in the same table.
-Trellis can help us here as well.
+Here we join across the two aggregates and group the results by author to get a total number of words.
+Now we can do a simple INNER JOIN from authors to this joined table and sort by the total words.
 
 ```sql
 SELECT
-    pt.tag,
-    SUM(p.word_count) AS total_words,
-    COUNT(*) AS post_count
-FROM public.post_tags pt
-JOIN public.posts p ON p.id = pt.post
-GROUP BY pt.tag
-ORDER BY total_words DESC
+    a.id,
+    a.name,
+    aa.commented_words,
+    aa.posted_words,
+    aa.word_total
+FROM authors a
+INNER JOIN author_agg aa ON a.id = aa.author
+ORDER BY aa.word_total DESC
 LIMIT 10;
 ```
 
-This will tell us which tags are most common by number of posts and/or by word count.
-We have the right basic indexes in-place like indexing posts on `id` so the join can be efficient, but we still have to lookup all of those individual word counts for each row in the `post_tags` table and then add them together when we do the grouping.
-This takes ~2.5s on my machine.
+This query now runs in 7ms (81x faster) and again we can define a column to make the sorting fast.
 
+```sql
+CREATE INDEX author_agg_total ON author_agg (word_total);
+```
+
+And the query now runs in 0.14ms (4,000x faster).
+Under the hood, each time a new post is created, or updated, the totals post_agg tables get updated with the total for that author.
+Then the author_agg table observes that change and updates its total word count.
+So the analyzed data is ready to query cheaply and accurately.
+
+### Latency
+
+So how does this compare to a materialized view that runs `REFRESH...CONCURRENTLY` on some kind of cron schedule?
+Let's start with a simple example.
+Back in your terminal where you've been running `trellis`, close the current CLI client (Ctrl+c) and start a new one with metrics enabled.
 
 ```
-./trellis define "RELATIONSHIP post FROM post_tags.post TO posts.id"
-./trellis define "TRANSFORM tag_totals FROM post_tags GROUP BY tag SELECT COUNT(*) AS post_count, SUM(post.word_count) AS total_words"
 ./trellis run --prometheus-bind 127.0.0.1:9988
 ```
 
-Now Trellis will create a table called `tag_totals` where it will create 1 row per unique tag.
-It will track which `post_tags` fall into each row of the totals table, and maintain a post count and a total word count on that table.
+Now while that's running, open a second terminal in the same directory and run the following:
 
-```sql
-SELECT tag, post_count, total_words
-FROM tag_totals
-ORDER BY total_words DESC
-LIMIT 10;
+```
+source ../postgres/env.sh
+./gen-data.sh 10
 ```
 
-On my machine, this simple query doesn't even need an index at all.
-Since there are a relatively small number of tags, the whole table fits easily in-memory and takes around `0.04ms` to execute the query (62,500x faster than the query above).
-
-And if we pick one of these tags, we can add it to 10 more posts with the query below.
-
-```sql
-INSERT INTO post_tags (post, tag)
-SELECT p.id, 'your-tag'
-FROM posts p
-WHERE NOT EXISTS (
-    SELECT 1 FROM post_tags pt
-    WHERE pt.post = p.id AND pt.tag = 'your-tag'
-)
-ORDER BY random()
-LIMIT 10;
-```
-
-Now you can check localhost:9988 in a browser tab and see the stats for how long it takes for data changes to propogate through the transforms.
-On my machine it takes between 250ms and 500ms for new writes to show up in the transforms.
+This will create a few more authors, posts and comments to the existing dataset.
+Now open a browser tab at http://localhost:9988/.
+This is the prometheus data that can be scraped for trellis clients.
+If you look for the lines that start with `trellis_end_to_end_latency_seconds_bucket{trellis_instance="trellis_poc/trellis",transform="author_agg"`, they represent a histogram of the the end-to-end latency for how long it takes writes to the underlying tables to show up in the final `author_agg` table we defined.
+In my case, they all show up in the `0.5` bucket meaning that within 500ms of data changing, the author_agg table has been updated.
+In our internal testing, we can maintain sub-second latency up to ~TODO source changes per second loads.
+This depends heavily on how many transforms you've chained together, what work the transform has to do and various other factors like vacuums and other background activity in Postgres.
+Sub-second latency is feasible for many common use-cases even under heavy load.
