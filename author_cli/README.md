@@ -19,7 +19,7 @@ source ../postgres/env.sh
 ./gen-data.sh 1000000
 ```
 
-> The timing numbers below were measured with 1M posts, but this takes several minutes to generate
+> The timing numbers below were measured with 10M posts, but this takes several minutes to generate
 > you can take off a couple of zeros if you just want to walk through the process without waiting.
 
 ## Finding the Most Prolific Authors
@@ -27,8 +27,8 @@ source ../postgres/env.sh
 Now you can inspect the postgres cluster using `psql`, or a visual tool like beekeper.
 
 ```shell
-./trellis define "TRANSFORM post_agg FROM posts GROUP BY author SELECT COUNT(*) AS post_count, SUM(word_count) AS word_total"
-./trellis define "TRANSFORM comment_agg FROM comments GROUP BY author SELECT COUNT(*) AS comment_count, SUM(word_count) AS word_total"
+./trellis apply "TRANSFORM post_agg FROM posts GROUP BY author SELECT COUNT(*) AS post_count, SUM(word_count) AS word_total"
+./trellis apply "TRANSFORM comment_agg FROM comments GROUP BY author SELECT COUNT(*) AS comment_count, SUM(word_count) AS word_total"
 ./trellis run
 ```
 
@@ -54,7 +54,7 @@ GROUP BY a.id, a.name
 ORDER BY posted_words DESC LIMIT 10;
 ```
 
-This query takes ~400ms when warm on my machine.
+This query takes ~5s when warm on my machine.
 
 I can now get this same answer by joining to the aggregated table like this.
 
@@ -65,7 +65,7 @@ JOIN authors a ON a.id = p.author
 ORDER BY p.word_total DESC LIMIT 10;
 ```
 
-This query takes ~36ms (11x faster) when warm on my machine because the word totals are already summed per author, so postgres just has to read those sums and compare them.
+This query takes ~200ms (25x faster) when warm on my machine because the word totals are already summed per author, so postgres just has to read those sums and compare them.
 
 And because this is just a regular postgres table, we can define a standard index.
 
@@ -74,7 +74,7 @@ CREATE INDEX post_total_words ON post_agg (word_total);
 ```
 
 And if we apply a simple index, the query above is even faster.
-If we look at `EXPLAIN ANALYZE` the actual execution time is ~0.12ms (3,333x faster).
+If we look at `EXPLAIN ANALYZE` the actual execution time is ~0.05ms (100,000x faster).
 
 The query is also a lot easier to read/understand. It's the same data as the expensive query, guaranteed correct, no race conditions, no data pipeline that needs to be built, no missed application messages to catch up on.
 
@@ -117,16 +117,15 @@ ORDER BY total_words DESC
 LIMIT 10;
 ```
 
-This takes 571ms on my machine when warmed and can't be improved with any index since Postgres has to sum and then add sums together in order to get the total before it can sort them.
+This takes ~8s on my machine when warmed and can't be improved with any index since Postgres has to sum and then add sums together in order to get the total before it can sort them.
 With Trellis we will use a JOIN across our existing aggregated transforms.
 
 ```
-./trellis define "TRANSFORM author_agg FROM comment_agg JOIN post_agg ON post_agg.author = comment_agg.author GROUP BY post_agg.author SELECT SUM(comment_agg.word_total) AS commented_words, SUM(post_agg.word_total) as posted_words, SUM(comment_agg.word_total) + SUM(post_agg.word_total) AS word_total"
+./trellis apply "TRANSFORM author_agg FROM authors LEFT JOIN comment_agg ON comment_agg.author = authors.id LEFT JOIN post_agg ON post_agg.author = authors.id SELECT COALESCE(comment_agg.word_total, 0) AS commented_words, COALESCE(post_agg.word_total, 0) as posted_words, COALESCE(comment_agg.word_total, 0) + COALESCE(post_agg.word_total, 0) AS word_total"
 ./trellis run
 ```
 
-Here we join across the two aggregates and group the results by author to get a total number of words.
-Now we can do a simple INNER JOIN from authors to this joined table and sort by the total words.
+Here we join from authors to the two aggregates to get a total number of words.
 
 ```sql
 SELECT
@@ -136,18 +135,18 @@ SELECT
     aa.posted_words,
     aa.word_total
 FROM authors a
-INNER JOIN author_agg aa ON a.id = aa.author
+INNER JOIN author_agg aa ON a.id = aa.id
 ORDER BY aa.word_total DESC
 LIMIT 10;
 ```
 
-This query now runs in 7ms (81x faster) and again we can define a column to make the sorting fast.
+This query now runs in 170ms (47x faster) and again we can define a column to make the sorting fast.
 
 ```sql
 CREATE INDEX author_agg_total ON author_agg (word_total);
 ```
 
-And the query now runs in 0.14ms (4,000x faster).
+And the query now runs in 0.17ms (47,000x faster).
 Under the hood, each time a new post is created, or updated, the totals post_agg tables get updated with the total for that author.
 Then the author_agg table observes that change and updates its total word count.
 So the analyzed data is ready to query cheaply and accurately.
