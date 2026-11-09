@@ -4,7 +4,7 @@ A quick POC that can be run locally to understand the capabilities of trellis.
 
 ## Requirements
 
-* Download a trellis CLI binary from the [trellis](https://github.com/salesforce-misc/trellis/releases) project and put it in this directory
+* Download the trellis CLI (v0.2.0 by default) into this directory by running `./get-trellis.sh` (pass a version, e.g. `./get-trellis.sh v0.1.0`, to override). Releases are published in the [trellis](https://github.com/salesforce-misc/trellis/releases) project
 * You should have the postgres commands available in your `$PATH`
 
 ## Setup
